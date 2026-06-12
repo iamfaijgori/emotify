@@ -36,7 +36,7 @@ class RegisterView(APIView):
 
         # Send OTP via email (async)
         from .utils import send_email_otp
-        send_email_otp(user.email, otp_code, 'register')
+        # send_email_otp(user.email, otp_code, 'register')
 
         return Response({
             'message': 'Registration successful. OTP sent to your email and phone.',
@@ -123,7 +123,7 @@ class ForgotPasswordView(APIView):
 
         otp_code = create_otp_record(user, 'password_reset')
         from .utils import send_email_otp
-        send_email_otp(user.email, otp_code, 'password_reset')
+        # send_email_otp(user.email, otp_code, 'password_reset')
 
         return Response({'message': 'If this email exists, an OTP has been sent.'})
 
@@ -173,7 +173,7 @@ class ResendOTPView(APIView):
 
         otp_code = create_otp_record(user, purpose)
         from .utils import send_email_otp
-        send_email_otp(user.email, otp_code, purpose)
+        # send_email_otp(user.email, otp_code, purpose)
 
         return Response({'message': 'OTP resent successfully.'})
 
