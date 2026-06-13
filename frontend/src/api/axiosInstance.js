@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 const axiosInstance = axios.create({
-  baseURL: 'https://emotify-backend-uwyv.onrender.com',
+  baseURL: import.meta.env.VITE_API_URL,
+  // baseURL: 'http://127.0.0.1:8000',   
   headers: {
     'Content-Type': 'application/json',
   },
@@ -29,7 +30,7 @@ axiosInstance.interceptors.response.use(
       original._retry = true;
       try {
         const refresh = localStorage.getItem('refresh_token');
-        const res = await axios.post('https://emotify-backend-uwyv.onrender.com/api/auth/token/refresh/', {
+        const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/token/refresh/`, {
           refresh,
         });
         localStorage.setItem('access_token', res.data.access);
