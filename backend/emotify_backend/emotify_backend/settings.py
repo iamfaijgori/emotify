@@ -137,3 +137,5 @@ CACHES = {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
     }
 }
+
+BREVO_API_KEY = config('BREVO_API_KEY')

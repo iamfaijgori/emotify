@@ -2,14 +2,17 @@ import random
 import string
 from datetime import timedelta
 from django.utils import timezone
-from django.core.mail import send_mail
 from django.conf import settings
 from twilio.rest import Client
-
+import sib_api_v3_sdk
+from sib_api_v3_sdk.rest import ApiException
 
 def generate_otp(length=6):
     """Generate a secure 6-digit OTP"""
     return ''.join(random.choices(string.digits, k=length))
+
+
+
 
 
 def send_email_otp(email, otp_code, purpose):
@@ -20,27 +23,36 @@ def send_email_otp(email, otp_code, purpose):
     }
     label = purpose_labels.get(purpose, 'Verification')
 
-    subject = f"Emotify — Your {label} OTP"
-    message = f"""
-Hi there!
+    configuration = sib_api_v3_sdk.Configuration()
+    configuration.api_key['api-key'] = settings.BREVO_API_KEY
 
-Your Emotify OTP for {label} is:
-
-    {otp_code}
-
-This OTP is valid for 5 minutes only.
-Do not share this with anyone.
-
-— Team Emotify
-    """
-    send_mail(
-        subject,
-        message,
-        settings.EMAIL_HOST_USER,
-        [email],
-        fail_silently=False,
+    api_instance = sib_api_v3_sdk.TransactionalEmailsApi(
+        sib_api_v3_sdk.ApiClient(configuration)
     )
 
+    send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+        to=[{"email": email}],
+        sender={"name": "Emotify", "email": settings.EMAIL_HOST_USER},
+        subject=f"Emotify — Your {label} OTP",
+        html_content=f"""
+            <div style="font-family: Arial, sans-serif; padding: 20px;">
+                <h2 style="color: #6C63FF;">Emotify</h2>
+                <p>Hi there!</p>
+                <p>Your OTP for <strong>{label}</strong> is:</p>
+                <h1 style="color: #FF6584; letter-spacing: 4px;">{otp_code}</h1>
+                <p>This OTP is valid for 5 minutes only.</p>
+                <p>Do not share this with anyone.</p>
+                <br>
+                <p>— Team Emotify</p>
+            </div>
+        """
+    )
+
+    try:
+        api_instance.send_transac_email(send_smtp_email)
+    except ApiException as e:
+        print(f"Brevo email error: {e}")
+        raise
 
 def send_sms_otp(phone_number, otp_code, purpose):
     purpose_labels = {
