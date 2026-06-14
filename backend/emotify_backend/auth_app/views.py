@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
-
+from .utils import create_otp_record, verify_otp_code, send_email_otp
 from users.models import User
 from .serializers import (
     RegisterSerializer, VerifyOTPSerializer, LoginSerializer,
@@ -28,21 +28,43 @@ class RegisterView(APIView):
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
+
+        # Check if user already exists but is unverified
+        email = request.data.get('email')
+        try:
+            existing_user = User.objects.get(email=email)
+            if not existing_user.is_verified:
+                # Resend OTP to this existing unverified user
+                otp_code = create_otp_record(existing_user, 'register')
+                send_email_otp(otp_code=otp_code, email=existing_user.email, purpose='register')
+                return Response({
+                    'message': 'Account already exists but is not verified. OTP resent to your email.',
+                    'email':   existing_user.email,
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response(
+                    {'email': 'An account with this email already exists.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except User.DoesNotExist:
+            pass
+
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         user     = serializer.save()
         otp_code = create_otp_record(user, 'register')
 
-        # Send OTP via email (async)
-        from .utils import send_email_otp
-        send_email_otp(user.email, otp_code, 'register')
+        send_email_otp(
+            email    = user.email,
+            otp_code = otp_code,
+            purpose  = 'register'
+        )
 
         return Response({
-            'message': 'Registration successful. OTP sent to your email and phone.',
+            'message': 'Registration successful. OTP sent to your email.',
             'email':   user.email,
         }, status=status.HTTP_201_CREATED)
-
 
 class VerifyOTPView(APIView):
     permission_classes = [AllowAny]
