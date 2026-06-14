@@ -50,6 +50,21 @@ def send_email_otp(email, otp_code, purpose):
         print(f"Brevo error: {response.text}")
         raise Exception(f"Email send failed: {response.text}")
 
+def send_sms_otp(phone_number, otp_code, purpose):
+    purpose_labels = {
+        'register':       'Email Verification',
+        'password_reset': 'Password Reset',
+        'login':          'Login Verification',
+    }
+    label = purpose_labels.get(purpose, 'Verification')
+
+    client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+    client.messages.create(
+        body=f"Your Emotify {label} OTP is: {otp_code}. Valid for 5 minutes. Do not share.",
+        from_=settings.TWILIO_PHONE_NUMBER,
+        to=phone_number
+    )
+
 def create_otp_record(user, purpose):
     """Create OTP record in DB and return the code"""
     from .models import OTPRecord
