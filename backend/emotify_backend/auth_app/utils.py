@@ -4,8 +4,6 @@ from datetime import timedelta
 from django.utils import timezone
 from django.conf import settings
 from twilio.rest import Client
-import sib_api_v3_sdk
-from sib_api_v3_sdk.rest import ApiException
 
 def generate_otp(length=6):
     """Generate a secure 6-digit OTP"""
@@ -23,52 +21,34 @@ def send_email_otp(email, otp_code, purpose):
     }
     label = purpose_labels.get(purpose, 'Verification')
 
-    configuration = sib_api_v3_sdk.Configuration()
-    configuration.api_key['api-key'] = settings.BREVO_API_KEY
-
-    api_instance = sib_api_v3_sdk.TransactionalEmailsApi(
-        sib_api_v3_sdk.ApiClient(configuration)
-    )
-
-    send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
-        to=[{"email": email}],
-        sender={"name": "Emotify", "email": settings.EMAIL_HOST_USER},
-        subject=f"Emotify — Your {label} OTP",
-        html_content=f"""
-            <div style="font-family: Arial, sans-serif; padding: 20px;">
-                <h2 style="color: #6C63FF;">Emotify</h2>
+    import requests as req
+    url = "https://api.brevo.com/v3/smtp/email"
+    headers = {
+        "accept":       "application/json",
+        "content-type": "application/json",
+        "api-key":      settings.BREVO_API_KEY,
+    }
+    payload = {
+        "sender":      {"name": "Emotify", "email": settings.EMAIL_HOST_USER},
+        "to":          [{"email": email}],
+        "subject":     f"Emotify — Your {label} OTP",
+        "htmlContent": f"""
+            <div style="font-family:Arial,sans-serif;padding:20px;max-width:400px;">
+                <h2 style="color:#6C63FF;">Emotify 🎵</h2>
                 <p>Hi there!</p>
                 <p>Your OTP for <strong>{label}</strong> is:</p>
-                <h1 style="color: #FF6584; letter-spacing: 4px;">{otp_code}</h1>
-                <p>This OTP is valid for 5 minutes only.</p>
+                <h1 style="color:#FF6584;letter-spacing:8px;font-size:36px;">{otp_code}</h1>
+                <p>This OTP is valid for <strong>5 minutes</strong> only.</p>
                 <p>Do not share this with anyone.</p>
                 <br>
-                <p>— Team Emotify</p>
+                <p style="color:#888;">— Team Emotify</p>
             </div>
         """
-    )
-
-    try:
-        api_instance.send_transac_email(send_smtp_email)
-    except ApiException as e:
-        print(f"Brevo email error: {e}")
-        raise
-
-def send_sms_otp(phone_number, otp_code, purpose):
-    purpose_labels = {
-        'register':       'Email Verification',
-        'password_reset': 'Password Reset',
-        'login':          'Login Verification',
     }
-    label = purpose_labels.get(purpose, 'Verification')
-
-    client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
-    client.messages.create(
-        body=f"Your Emotify {label} OTP is: {otp_code}. Valid for 5 minutes. Do not share.",
-        from_=settings.TWILIO_PHONE_NUMBER,
-        to=phone_number
-    )
-
+    response = req.post(url, json=payload, headers=headers)
+    if response.status_code not in (200, 201):
+        print(f"Brevo error: {response.text}")
+        raise Exception(f"Email send failed: {response.text}")
 
 def create_otp_record(user, purpose):
     """Create OTP record in DB and return the code"""
